@@ -9,6 +9,8 @@ ON = 255
 OFF = 0
 vals = [ON, OFF]
 
+# hey I'm a new comment.
+
 
 def randomGrid(N):
     """returns a grid of NxN random values"""
