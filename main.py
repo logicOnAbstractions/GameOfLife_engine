@@ -9,8 +9,6 @@ ON = 255
 OFF = 0
 vals = [ON, OFF]
 
-# hey I'm a new comment.
-# and another one
 
 
 def randomGrid(N):
