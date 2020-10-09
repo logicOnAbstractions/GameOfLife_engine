@@ -1,8 +1,72 @@
+""" code in this file originally from Geekgs4geeks: https://www.geeksforgeeks.org/program-for-conways-game-of-life/
+
+    will probably be modified here. structure may be sent off to different files etc... for a more flexible structure.
+
+    but core logic from them.
+"""
+
 # Python code to implement Conway's Game Of Life
 import argparse
 import numpy as np
+import matplotlib
+matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from game import GameOfLife
+from utils import *
+
+class MainProgram:
+    """ the runner of the simulation """
+    def __init__(self):
+        self.parse_cmdline_args()
+        self.game = GameOfLife(grid_size=self.grid_size, start_pattern=self.start_pattern)
+
+
+    def parse_cmdline_args(self):
+        """ parses stuff.
+
+            to use the values from destinations:
+            parser.add_argument('--grid-size', dest='N')
+            self.args = parser.parse_args()     # assigns everything to mapping
+            (... code.... )
+
+            print(self.args.N)                  # accessing value of --grid-size store as variable N
+
+        """
+
+        # parse arguments
+        parser = argparse.ArgumentParser(description="Runs Conway's Game of Life simulation.")
+
+        # assign args to vars ("dest=...")
+        parser.add_argument('--grid-size', dest='N', required=False)
+        parser.add_argument('--mov-file', dest='movfile', required=False)
+        parser.add_argument('--interval', dest='interval', required=False)
+        parser.add_argument('--glider', action='store_true', required=False)
+        parser.add_argument('--gosper', action='store_true', required=False)
+
+        # awesome. we now get a mapping of args according to what we wrote above
+        self.args = parser.parse_args()
+
+    @property
+    def grid_size(self):
+        return self.args.N
+
+    @property
+    def glider(self):
+        return self.args.glider
+
+    @property
+    def gosper(self):
+        return self.args.gosper
+
+    @property
+    def start_pattern(self):
+        """ returning a string so that the caller can just a a single argment &
+        parse it on the other side """
+        if self.glider:
+            return GLIDER
+        elif self.gosper:
+            return GOSPER
 
 # setting up the values for the grid
 ON = 255
@@ -10,11 +74,11 @@ OFF = 0
 vals = [ON, OFF]
 
 
+""" I think those are the different grid options """
 
 def randomGrid(N):
     """returns a grid of NxN random values"""
     return np.random.choice(vals, N * N, p=[0.2, 0.8]).reshape(N, N)
-
 
 def addGlider(i, j, grid):
     """adds a glider with top left cell at (i, j)"""
@@ -22,7 +86,6 @@ def addGlider(i, j, grid):
                        [255, 0, 255],
                        [0, 255, 255]])
     grid[i:i + 3, j:j + 3] = glider
-
 
 def addGosperGliderGun(i, j, grid):
     """adds a Gosper Glider Gun with top left
@@ -53,14 +116,12 @@ def addGosperGliderGun(i, j, grid):
 
     grid[i:i + 11, j:j + 38] = gun
 
-
 def update(frameNum, img, grid, N):
     # copy grid since we require 8 neighbors
     # for calculation and we go line by line
     newGrid = grid.copy()
     for i in range(N):
         for j in range(N):
-
             # compute 8-neghbor sum
             # using toroidal boundary conditions - x and y wrap around
             # so that the simulaton takes place on a toroidal surface.
@@ -76,26 +137,24 @@ def update(frameNum, img, grid, N):
             else:
                 if total == 3:
                     newGrid[i, j] = ON
-
                 # update data
     img.set_data(newGrid)
     grid[:] = newGrid[:]
     return img,
 
 
-# main() function
 def main():
-    # Command line args are in sys.argv[1], sys.argv[2] ..
-    # sys.argv[0] is the script name itself and can be ignored
     # parse arguments
     parser = argparse.ArgumentParser(description="Runs Conway's Game of Life simulation.")
 
-    # add arguments
+    # assign args to vars ("dest")
     parser.add_argument('--grid-size', dest='N', required=False)
     parser.add_argument('--mov-file', dest='movfile', required=False)
     parser.add_argument('--interval', dest='interval', required=False)
     parser.add_argument('--glider', action='store_true', required=False)
     parser.add_argument('--gosper', action='store_true', required=False)
+
+    # awesome. we now get a mapping of args according to what we wrote above
     args = parser.parse_args()
 
     # set grid size
@@ -103,7 +162,7 @@ def main():
     if args.N and int(args.N) > 8:
         N = int(args.N)
 
-    # set animation update interval
+    # set animation update interval         - ms?
     updateInterval = 50
     if args.interval:
         updateInterval = int(args.interval)
@@ -141,4 +200,6 @@ def main():
 
 # call main
 if __name__ == '__main__':
+    # mp = MainProgram()
+
     main()
