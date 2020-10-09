@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from game import GameOfLife
+from game import GameOfLife, GameOfLifeHeadless
 from utils import *
 import time
 import threading
@@ -24,7 +24,11 @@ class MainProgram:
     def __init__(self):
         self.LOG        = self.get_logger()
         self.parse_cmdline_args()
-        self.game       = GameOfLife(grid_size=self.grid_size, start_pattern=self.start_pattern, display=self.display)
+
+        if self.display:
+            self.game       = GameOfLife(grid_size=self.grid_size, start_pattern=self.start_pattern)
+        else:
+            self.game       = GameOfLifeHeadless(grid_size=self.grid_size, start_pattern=self.start_pattern)
 
         self.LOG.info(f"Done init in {self.__class__.__name__}.")
 

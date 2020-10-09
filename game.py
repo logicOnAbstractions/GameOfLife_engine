@@ -8,9 +8,8 @@ from logger import get_root_logger
 
 class GameOfLife:
     """ contains the game itself. somewhat like the Simulation obj. in RT """
-    def __init__(self, grid_size=100, start_pattern=RANDOM, display=False, movfile=None):
+    def __init__(self, grid_size=100, start_pattern=RANDOM, movfile=None):
         """
-
         """
         self.LOG = self.get_logger()
         self.interval       = 50
@@ -21,19 +20,11 @@ class GameOfLife:
         self.img            = self.ax.imshow(self.grid, interpolation='nearest')
 
         self.LOG.info(f"Done init in {self.__class__.__name__}.")
-        self.run()
-
 
     def run(self):
         """ target of the threads that controls the simulation """
-        self.LOG.info(f"Running {self.__class__.__name__}")
-        ani = animation.FuncAnimation(self.fig, self.update, fargs=(),
-                                      frames=10,
-                                      interval=self.interval,
-                                      save_count=50)
-        if self.movfile:
-            ani.save(self.movfile, fps=30, extra_args=['-vcodec', 'libx264'])
-        plt.show()
+        raise NotImplemented
+
 
     def init_grid(self, grid_size):
         """ initializes a grid according to arguments passed.
@@ -47,35 +38,9 @@ class GameOfLife:
         else:
             return np.zeros(grid_size * grid_size).reshape(grid_size, grid_size)
 
-    def update(self, dummy):
+    def update(self, dummy=None):
         """ moves the Game one generation further """
-        # copy self.grid since we require 8 neighbors
-        # for calculation and we go line by line
-
-        N = self.grid.shape[0]
-        self.LOG.info(f"{self.__class__.__name__} updateting.... ")
-        tmp_grid = self.grid.copy()
-        for i in range(N):
-            for j in range(N):
-                # compute 8-neghbor sum
-                # using toroidal boundary conditions - x and y wrap around
-                # so that the simulaton takes place on a toroidal surface.
-                total = int((self.grid[i, (j - 1) % N] + self.grid[i, (j + 1) % N] +
-                             self.grid[(i - 1) % N, j] + self.grid[(i + 1) % N, j] +
-                             self.grid[(i - 1) % N, (j - 1) % N] + self.grid[(i - 1) % N, (j + 1) % N] +
-                             self.grid[(i + 1) % N, (j - 1) % N] + self.grid[(i + 1) % N, (j + 1) % N]) / 255)
-
-                # apply Conway's rules
-                if self.grid[i, j] == ON:
-                    if (total < 2) or (total > 3):
-                        tmp_grid[i, j] = OFF
-                else:
-                    if total == 3:
-                        tmp_grid[i, j] = ON
-                    # update data
-        self.img.set_data(tmp_grid)
-        self.grid[:] = tmp_grid[:]
-        return self.img,
+        raise NotImplemented
     
     def add_glider(self, i, j):
         """ adds a glider at the top left (i,j) cell of that area """
@@ -121,11 +86,94 @@ class GameOfLife:
         logger.info(f"Initated logger in {self.__class__.__name__} ")
         return logger
 
-# TODO: finish the headless version. we'll ahve to adapt the grid dimensions so it becase a cubic one, or
-# define another structure which holds many grid, creating the rd thing.s
+
+class GameOfLifeDisplay(GameOfLife):
+    def __init__(self, *args, **kwargs):
+        """ """
+        super().__init__(*args, **kwargs)
+        self.run()
+
+    def run(self):
+        """ target of the threads that controls the simulation """
+        self.LOG.info(f"Running {self.__class__.__name__}")
+        ani = animation.FuncAnimation(self.fig, self.update, fargs=(),
+                                      frames=10,
+                                      interval=self.interval,
+                                      save_count=50)
+        if self.movfile:
+            ani.save(self.movfile, fps=30, extra_args=['-vcodec', 'libx264'])
+        plt.show()
+
+
+    def update(self, dummy=None):
+        """ moves the Game one generation further """
+        # copy self.grid since we require 8 neighbors
+        # for calculation and we go line by line
+
+        N = self.grid.shape[0]
+        self.LOG.info(f"{self.__class__.__name__} updateting.... ")
+        tmp_grid = self.grid.copy()
+        for i in range(N):
+            for j in range(N):
+                # compute 8-neghbor sum
+                # using toroidal boundary conditions - x and y wrap around
+                # so that the simulaton takes place on a toroidal surface.
+                total = int((self.grid[i, (j - 1) % N] + self.grid[i, (j + 1) % N] +
+                             self.grid[(i - 1) % N, j] + self.grid[(i + 1) % N, j] +
+                             self.grid[(i - 1) % N, (j - 1) % N] + self.grid[(i - 1) % N, (j + 1) % N] +
+                             self.grid[(i + 1) % N, (j - 1) % N] + self.grid[(i + 1) % N, (j + 1) % N]) / 255)
+
+                # apply Conway's rules
+                if self.grid[i, j] == ON:
+                    if (total < 2) or (total > 3):
+                        tmp_grid[i, j] = OFF
+                else:
+                    if total == 3:
+                        tmp_grid[i, j] = ON
+                    # update data
+        self.img.set_data(tmp_grid)
+        self.grid[:] = tmp_grid[:]
+        return self.img,
+
+
 class GameOfLifeHeadless(GameOfLife):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.keep_running       = threading.Event()
+        self.keep_running.set()
+        self.life_thread        = threading.Thread(target=self.run, args=(), name="life")
+        self.life_thread.start()
+
     def run(self):
-        """ for the headless vesrion, we just update the self.grid object by adding data layers in the 3rd axis """
+        """ instead of img.set_data(...) here we update the grid obj, which is also 3d (3rd axis == generations)"""
+        self.LOG.info(f"Life thread starting... ")
+        while self.keep_running.is_set():
+            self.update()
+
+    def update(self, dummy=None):
+        """ update a different object here """
+        self.LOG.info(f"{self.__class__.__name__} update.... ")
+        N = self.grid.shape[0]
+        self.LOG.info(f"{self.__class__.__name__} updateting.... ")
+        tmp_grid = self.grid.copy()
+        for i in range(N):
+            for j in range(N):
+                # compute 8-neghbor sum
+                # using toroidal boundary conditions - x and y wrap around
+                # so that the simulaton takes place on a toroidal surface.
+                total = int((self.grid[i, (j - 1) % N] + self.grid[i, (j + 1) % N] +
+                             self.grid[(i - 1) % N, j] + self.grid[(i + 1) % N, j] +
+                             self.grid[(i - 1) % N, (j - 1) % N] + self.grid[(i - 1) % N, (j + 1) % N] +
+                             self.grid[(i + 1) % N, (j - 1) % N] + self.grid[(i + 1) % N, (j + 1) % N]) / 255)
+
+                # apply Conway's rules
+                if self.grid[i, j] == ON:
+                    if (total < 2) or (total > 3):
+                        tmp_grid[i, j] = OFF
+                else:
+                    if total == 3:
+                        tmp_grid[i, j] = ON
+                    # update data
+        self.grid[:] = tmp_grid[:]
+        self.LOG.info(f"Sum of the grid: {np.sum(self.grid)}")
