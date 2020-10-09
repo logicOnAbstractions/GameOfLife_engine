@@ -14,15 +14,22 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from game import GameOfLife
 from utils import *
+import time
+import threading
+from logger import get_root_logger
+
 
 class MainProgram:
     """ the runner of the simulation """
     def __init__(self):
+        self.LOG        = self.get_logger()
         self.parse_cmdline_args()
-        self.game = GameOfLife(grid_size=self.grid_size, start_pattern=self.start_pattern)
+        self.game       = GameOfLife(grid_size=self.grid_size, start_pattern=self.start_pattern, display=self.display)
 
+        self.LOG.info(f"Done init in {self.__class__.__name__}.")
 
     def parse_cmdline_args(self):
+        self.LOG.info(f"Parsing args in {self.__class__.__name__}")
         """ parses stuff.
 
             to use the values from destinations:
@@ -38,14 +45,16 @@ class MainProgram:
         parser = argparse.ArgumentParser(description="Runs Conway's Game of Life simulation.")
 
         # assign args to vars ("dest=...")
-        parser.add_argument('--grid-size', dest='N', required=False)
-        parser.add_argument('--mov-file', dest='movfile', required=False)
-        parser.add_argument('--interval', dest='interval', required=False)
-        parser.add_argument('--glider', action='store_true', required=False)
-        parser.add_argument('--gosper', action='store_true', required=False)
+        parser.add_argument('--grid-size', dest='N', required=False, default=100)  # obv.
+        parser.add_argument('--mov-file', dest='movfile', required=False, default=None)  # to save outputs
+        parser.add_argument('--interval', dest='interval', required=False, default=100)  # between each generations, ms
+        parser.add_argument('--glider', action='store_true', required=False, default=False)  # initial lifeform
+        parser.add_argument('--gosper', action='store_true', required=False, default=False)  # spawning lifeform
+        parser.add_argument('--display', action='store_true', required=False, default=False)  # if disp. w mplt or just print on console
 
         # awesome. we now get a mapping of args according to what we wrote above
         self.args = parser.parse_args()
+        self.LOG.info(f"Parsing done.")
 
     @property
     def grid_size(self):
@@ -67,6 +76,25 @@ class MainProgram:
             return GLIDER
         elif self.gosper:
             return GOSPER
+        else:
+            return RANDOM
+
+    @property
+    def display(self):
+        """ determines if we use im.show() & FuncAnim or just dump data into a numpy array 3d"""
+        return self.args.display
+
+    def get_logger(self):
+        """ inits the logs. should only be if for whatever reason no logger has been defined """
+        logger = get_root_logger(BASE_LOGGER_NAME, filename=f'log.log')
+        logger.info(f"Initated logger in {self.__class__.__name__} ")
+        logger.debug(f'logger debug level msg ')
+        logger.info(f'logger info level msg ')
+        logger.warning(f'logger warn level msg ')
+        logger.error(f'logger error level msg ')
+        logger.critical(f'logger critical level msg ')
+        return logger
+
 
 # setting up the values for the grid
 ON = 255
@@ -117,6 +145,7 @@ def addGosperGliderGun(i, j, grid):
     grid[i:i + 11, j:j + 38] = gun
 
 def update(frameNum, img, grid, N):
+# def update(frameNum, ax, grid, N):
     # copy grid since we require 8 neighbors
     # for calculation and we go line by line
     newGrid = grid.copy()
@@ -138,9 +167,43 @@ def update(frameNum, img, grid, N):
                 if total == 3:
                     newGrid[i, j] = ON
                 # update data
+
+    # ############## works ###############3
     img.set_data(newGrid)
     grid[:] = newGrid[:]
     return img,
+    # ############## works ###############3
+
+    # ################## tests ##############
+    # grid[:] = newGrid[:]
+    # return ax.imshow(grid, interpolation='nearest')
+    # ################## tests ##############
+
+def update_headless(grid, N):
+    """ side-effect: updates the grid obj. """
+    # copy grid since we require 8 neighbors
+    # for calculation and we go line by line
+    newGrid = grid.copy()
+    for i in range(N):
+        for j in range(N):
+            # compute 8-neghbor sum
+            # using toroidal boundary conditions - x and y wrap around
+            # so that the simulaton takes place on a toroidal surface.
+            total = int((grid[i, (j - 1) % N] + grid[i, (j + 1) % N] +
+                         grid[(i - 1) % N, j] + grid[(i + 1) % N, j] +
+                         grid[(i - 1) % N, (j - 1) % N] + grid[(i - 1) % N, (j + 1) % N] +
+                         grid[(i + 1) % N, (j - 1) % N] + grid[(i + 1) % N, (j + 1) % N]) / 255)
+
+            # apply Conway's rules
+            if grid[i, j] == ON:
+                if (total < 2) or (total > 3):
+                    newGrid[i, j] = OFF
+            else:
+                if total == 3:
+                    newGrid[i, j] = ON
+                # update data
+    grid[:] = newGrid[:]
+
 
 
 def main():
@@ -148,11 +211,12 @@ def main():
     parser = argparse.ArgumentParser(description="Runs Conway's Game of Life simulation.")
 
     # assign args to vars ("dest")
-    parser.add_argument('--grid-size', dest='N', required=False)
-    parser.add_argument('--mov-file', dest='movfile', required=False)
-    parser.add_argument('--interval', dest='interval', required=False)
-    parser.add_argument('--glider', action='store_true', required=False)
-    parser.add_argument('--gosper', action='store_true', required=False)
+    parser.add_argument('--grid-size', dest='N', required=False, default=100)                # obv.
+    parser.add_argument('--mov-file', dest='movfile', required=False, default=None)           # to save outputs
+    parser.add_argument('--interval', dest='interval', required=False, default=100)          # between each generations, ms
+    parser.add_argument('--glider', action='store_true', required=False, default=False)        # initial lifeform
+    parser.add_argument('--gosper', action='store_true', required=False, default=False)        # spawning lifeform
+    parser.add_argument('--display', action='store_true', required=False, default=False)       # if disp. w mplt or just print on console
 
     # awesome. we now get a mapping of args according to what we wrote above
     args = parser.parse_args()
@@ -184,22 +248,29 @@ def main():
 
     # set up animation
     fig, ax = plt.subplots()
-    img = ax.imshow(grid, interpolation='nearest')
-    ani = animation.FuncAnimation(fig, update, fargs=(img, grid, N,),
-                                  frames=10,
-                                  interval=updateInterval,
-                                  save_count=50)
 
-    # # of frames?
-    # set output file
-    if args.movfile:
-        ani.save(args.movfile, fps=30, extra_args=['-vcodec', 'libx264'])
+    if args.display:                            # what the initial code does
+        img = ax.imshow(grid, interpolation='nearest')
+        ani = animation.FuncAnimation(fig, update, fargs=(img, grid, N,),
+                                      frames=10,
+                                      interval=updateInterval,
+                                      save_count=50)
+        if args.movfile:
+            ani.save(args.movfile, fps=30, extra_args=['-vcodec', 'libx264'])
+        plt.show()
+    else:                                           # new headless mode for simulations, parallele comps.
+        generation = 1e2
+        x = 0
+        while x < generation:
+            update_headless(grid, N)
+            x += 1
 
+    state = plt.imshow(grid)
     plt.show()
 
 
 # call main
 if __name__ == '__main__':
-    # mp = MainProgram()
+    mp = MainProgram()
 
-    main()
+    # main()
