@@ -111,7 +111,7 @@ class GameOfLifeDisplay(GameOfLife):
         # for calculation and we go line by line
 
         N = self.grid.shape[0]
-        self.LOG.info(f"{self.__class__.__name__} updateting.... ")
+        self.LOG.debug(f"{self.__class__.__name__} updateting.... ")
         tmp_grid = self.grid.copy()
         for i in range(N):
             for j in range(N):
@@ -140,6 +140,7 @@ class GameOfLifeHeadless(GameOfLife):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.datacube           = np.zeros(self.grid.shape)
         self.keep_running       = threading.Event()
         self.keep_running.set()
         self.life_thread        = threading.Thread(target=self.run, args=(), name="life")
@@ -153,9 +154,8 @@ class GameOfLifeHeadless(GameOfLife):
 
     def update(self, dummy=None):
         """ update a different object here """
-        self.LOG.info(f"{self.__class__.__name__} update.... ")
+        self.LOG.debug(f"{self.__class__.__name__} update.... ")
         N = self.grid.shape[0]
-        self.LOG.info(f"{self.__class__.__name__} updateting.... ")
         tmp_grid = self.grid.copy()
         for i in range(N):
             for j in range(N):
@@ -176,4 +176,4 @@ class GameOfLifeHeadless(GameOfLife):
                         tmp_grid[i, j] = ON
                     # update data
         self.grid[:] = tmp_grid[:]
-        self.LOG.info(f"Sum of the grid: {np.sum(self.grid)}")
+        self.LOG.debug(f"Sum of the grid: {np.sum(self.grid)}")
