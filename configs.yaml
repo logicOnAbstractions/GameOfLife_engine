@@ -1,0 +1,28 @@
+default:
+  game:
+    grid_size: 90
+    interval: 45
+    start_pattern: random
+  main_program:
+    delay_start: false
+    display: true
+headless_gosper:
+  game:
+    start_pattern: gosper
+  main_program:
+    display: false
+headless_glider:
+  game:
+    start_pattern: glider
+  main_program:
+    display: false
+display_gosper:
+  game:
+    start_pattern: gosper
+  main_program:
+    display: true
+display_glider:
+  game:
+    start_pattern: glider
+  main_program:
+    display: true

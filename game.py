@@ -7,24 +7,57 @@ import matplotlib.animation as animation
 from logger import get_root_logger
 
 class GameOfLife:
-    """ contains the game itself. somewhat like the Simulation obj. in RT """
-    def __init__(self, grid_size=100, start_pattern=RANDOM, movfile=None):
+    """ contains the game itself. somewhat like the Simulation obj. in RT
+
+     TODO: add a reset to return game to a default state
+     things to reset:
+        - grid
+        - some way to allow re-providing arguments (--glider etc.)
+        - consider making the auto-start optional
+
+     """
+    def __init__(self, configs, mode="default", grid_size=100, start_pattern=RANDOM, movfile=None):
         """
         """
-        self.LOG = self.get_logger()
+        self.LOG            = self.get_logger()
+        self.full_configs   = configs               # same as received from mp
+        self.mode           = mode
+        # those can be set from config file
+        self.grid_size      = 10
         self.interval       = 50
         self.movfile        = movfile
         self.start_pattern  = start_pattern
-        self.grid           = self.init_grid(grid_size)
+        self.init_args()
+
+        self.grid           = None
+        self.init_grid(grid_size)               # sets all elements in grid - any patterns, size, etc.
         self.fig, self.ax   = plt.subplots()
         self.img            = self.ax.imshow(self.grid, interpolation='nearest')
 
         self.LOG.info(f"Done init in {self.__class__.__name__}.")
 
-    def run(self):
+    def init_args(self):
+        """ parses whatever args we have & sets up this class accordingly """
+
+        for k, v in self.game_configs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+            else:
+                self.LOG.warning(f"Config file contains an attribute that is not in this class's attribute and therefore has not been set (k,v): {k}, {v}")
+
+        if self.mode != "default":                  # then those will complement/override the default values
+            for k, v in self.full_configs[self.mode]["game"].items():
+                if hasattr(self, k):
+                    setattr(self, k, v)
+                else:
+                    self.LOG.warning(f"Config file contains an attribute that is not in this class's attribute and therefore has not been set (k,v): {k}, {v}")
+
+    def start(self):
         """ target of the threads that controls the simulation """
         raise NotImplemented
 
+    def reset(self):
+        """ allows us to return to some neutral state."""
 
     def init_grid(self, grid_size):
         """ initializes a grid according to arguments passed.
@@ -34,15 +67,19 @@ class GameOfLife:
 
         self.LOG.info(f"Init grid... Pattern: {self.start_pattern}")
         if self.start_pattern == RANDOM:
-            return np.random.choice([ON, OFF], grid_size*grid_size, p=[0.2, 0.8]).reshape(grid_size, grid_size)
+            self.grid = np.random.choice([ON, OFF], grid_size*grid_size, p=[0.2, 0.8]).reshape(grid_size, grid_size)
         else:
-            return np.zeros(grid_size * grid_size).reshape(grid_size, grid_size)
+            self.grid = np.zeros(grid_size * grid_size).reshape(grid_size, grid_size)
+            if self.start_pattern == GLIDER:
+                self.add_glider()
+            elif self.start_pattern == GOSPER:
+                self.add_gosper_gun()
 
     def update(self, dummy=None):
         """ moves the Game one generation further """
         raise NotImplemented
     
-    def add_glider(self, i, j):
+    def add_glider(self, i=1, j=1):
         """ adds a glider at the top left (i,j) cell of that area """
         self.LOG.info(f"Adding a glider... ")
         glider = np.array([[0, 0, 255],
@@ -50,7 +87,7 @@ class GameOfLife:
                            [0, 255, 255]])
         self.grid[i:i + 3, j:j + 3] = glider
         
-    def add_gosper_gun(self, i, j):
+    def add_gosper_gun(self, i=10, j=10):
         """ adds a thing that spits out gliders """
         self.LOG.info(f"Adding a gosper... ")
 
@@ -86,14 +123,17 @@ class GameOfLife:
         logger.info(f"Initated logger in {self.__class__.__name__} ")
         return logger
 
+    @property
+    def game_configs(self):
+        return self.full_configs["default"]["game"]
+
 
 class GameOfLifeDisplay(GameOfLife):
     def __init__(self, *args, **kwargs):
         """ """
         super().__init__(*args, **kwargs)
-        self.run()
 
-    def run(self):
+    def start(self):
         """ target of the threads that controls the simulation """
         self.LOG.info(f"Running {self.__class__.__name__}")
         ani = animation.FuncAnimation(self.fig, self.update, fargs=(),
@@ -144,6 +184,9 @@ class GameOfLifeHeadless(GameOfLife):
         self.keep_running       = threading.Event()
         self.keep_running.set()
         self.life_thread        = threading.Thread(target=self.run, args=(), name="life")
+
+
+    def start(self):
         self.life_thread.start()
 
     def run(self):
